@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 // import prisma from "@/lib/prisma";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const jobId = params.id;
+    const { id: jobId } = await params;
     const body = await req.json();
     const { 
       insertAfterSequence, // The sequence number after which the new transfer leg will be injected
