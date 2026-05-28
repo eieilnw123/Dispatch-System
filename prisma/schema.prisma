@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // This URL will be replaced with your actual Supabase PostgreSQL connection string
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------
+// ENUMS
+// ---------------------------------------------------------
+enum ContainerSize {
+  FT_20
+  FT_40
+}
+
+enum LocationType {
+  EMPTY_YARD
+  FULL_YARD
+  FACTORY
+  PORT_TERMINAL
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_DUTY
+  OFF_DUTY
+}
+
+enum TruckStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+}
+
+enum JobStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LegStatus {
+  PENDING
+  IN_TRANSIT
+  ARRIVED
+  COMPLETED
+}
+
+// ---------------------------------------------------------
+// MASTER DATA
+// ---------------------------------------------------------
+model Driver {
+  id        String       @id @default(uuid())
+  name      String
+  phone     String?
+  status    DriverStatus @default(AVAILABLE)
+  legs      JobLeg[]     
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Truck {
+  id           String      @id @default(uuid())
+  plateNumber  String      @unique
+  truckType    String      
+  status       TruckStatus @default(AVAILABLE)
+  legs         JobLeg[]    
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model Location {
+  id           String       @id @default(uuid())
+  name         String
+  type         LocationType
+  latitude     Float?
+  longitude    Float?
+  address      String?
+  slots        YardSlot[]   
+  originLegs   JobLeg[]     @relation("OriginLocation")
+  destLegs     JobLeg[]     @relation("DestLocation")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model YardSlot {
+  id         String   @id @default(uuid())
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  zone       String   // e.g., "Zone 4"
+  row        String   // e.g., "Row B"
+  originLegs JobLeg[] @relation("OriginSlot")
+  destLegs   JobLeg[] @relation("DestSlot")
+  createdAt  DateTime @default(now())
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  jobs      Job[]
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------
+// TRANSACTIONAL DATA (JOBS & LEGS)
+// ---------------------------------------------------------
+model Job {
+  id            String        @id @default(uuid())
+  date          DateTime
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  containerSize ContainerSize
+  invoiceRef    String?
+  codeRef       String?
+  vgm           Float?        // Verified Gross Mass
+  cutOffTime    DateTime?
+  status        JobStatus     @default(PENDING)
+  
+  legs          JobLeg[]      // Multi-Leg routing
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model JobLeg {
+  id                 String    @id @default(uuid())
+  jobId              String
+  job                Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  sequenceOrder      Int       
+  
+  containerNumber    String?   // Can change if container is swapped mid-job
+
+  // Origin
+  originId           String
+  origin             Location  @relation("OriginLocation", fields: [originId], references: [id])
+  originSlotId       String?
+  originSlot         YardSlot? @relation("OriginSlot", fields: [originSlotId], references: [id])
+  
+  // Destination
+  destinationId      String
+  destination        Location  @relation("DestLocation", fields: [destinationId], references: [id])
+  destSlotId         String?
+  destSlot           YardSlot? @relation("DestSlot", fields: [destSlotId], references: [id])
+
+  // Driver & Truck
+  driverId           String?
+  driver             Driver?   @relation(fields: [driverId], references: [id])
+  truckId            String?
+  truck              Truck?    @relation(fields: [truckId], references: [id])
+  
+  // Distance & Cost
+  distanceKm         Float     @default(0.0)
+  estimatedHours     Float     @default(0.0)
+  isBillable         Boolean   @default(false)
+  
+  status             LegStatus @default(PENDING)
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([jobId, sequenceOrder])
+}
