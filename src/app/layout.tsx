@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ระบบจัดคิวรถบรรทุก (GoldSignal Dispatch)",
+  title: "ระบบจัดคิวรถบรรทุก",
   description: "ระบบบริหารจัดการงานขนส่งและโอนย้ายลานตู้คอนเทนเนอร์",
 };
 
